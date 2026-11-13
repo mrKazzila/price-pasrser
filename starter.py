@@ -57,60 +57,78 @@ async def recommend_price(
             timeout=timeout_s,
         )
     except asyncio.TimeoutError:
-        return {
-            "price": current_price,
-            "decision": "HOLD",
-            "reason": "Превышено время ожидания источника",
-        }
+        return _hold(
+            current_price=current_price,
+            reason="Превышено время ожидания источника",
+        )
     except Exception:
-        return {
-            "price": current_price,
-            "decision": "HOLD",
-            "reason": "Ошибка источника",
-        }
+        return _hold(
+            current_price=current_price,
+            reason="Ошибка источника",
+        )
 
     if result["status"] != "success":
-        return {
-            "price": current_price,
-            "decision": "HOLD",
-            "reason": "Источник вернул неуспешный статус",
-        }
+        return _hold(
+            current_price=current_price,
+            reason="Источник вернул неуспешный статус",
+        )
 
-    prices = [
+    prices = _get_competitor_prices(offers=result["offers"])
+
+    if not prices:
+        return _hold(
+            current_price=current_price,
+            reason="Нет подходящих предложений конкурентов",
+        )
+
+    price = _calculate_price(
+        prices=prices,
+        min_price=min_price,
+    )
+
+    requires_review = (
+        abs(price - current_price) > current_price * Decimal("0.30")
+    )
+
+    return {
+        "price": price,
+        "decision": "REVIEW" if requires_review else "APPLY",
+        "reason": (
+            "Изменение цены более чем на 30%, требуется ручная проверка"
+            if requires_review
+            else "Найдена минимальная цена"
+        ),
+    }
+
+
+def _hold(*, current_price: Decimal, reason: str) -> dict:
+    return {
+        "price": current_price,
+        "decision": "HOLD",
+        "reason": reason,
+    }
+
+
+def _get_competitor_prices(*, offers: list[dict]) -> list[Decimal]:
+    return [
         offer["price"]
-        for offer in result["offers"]
+        for offer in offers
         if offer["delivery_days"] is not None
         and offer["delivery_days"] <= 6
         and offer["seller"].casefold() != "myshop"
     ]
 
-    if not prices:
-        return {
-            "price": current_price,
-            "decision": "HOLD",
-            "reason": "Нет подходящих предложений конкурентов",
-        }
 
+def _calculate_price(
+    *,
+    prices: list[Decimal],
+    min_price: Decimal,
+) -> Decimal:
     competitor_price = (
         min(prices) * Decimal("0.985")
     ).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
 
-    price = max(competitor_price, min_price)
-
-    difference = abs(price - current_price)
-    threshold = current_price * Decimal("0.30")
-
-    decision = "REVIEW" if difference > threshold else "APPLY"
-
-    return {
-        "price": price,
-        "decision": decision,
-        "reason": (
-            "Изменение цены более чем на 30%, требуется ручная проверка"
-            if decision == "REVIEW"
-            else "Найдена минимальная цена"
-        ),
-    }
+    return max(competitor_price, min_price)
 
 
 async def sample_fetch_offers():
