@@ -97,10 +97,19 @@ async def recommend_price(
 
     price = max(competitor_price, min_price)
 
+    difference = abs(price - current_price)
+    threshold = current_price * Decimal("0.30")
+
+    decision = "REVIEW" if difference > threshold else "APPLY"
+
     return {
         "price": price,
-        "decision": "APPLY",
-        "reason": "Найдена минимальная цена",
+        "decision": decision,
+        "reason": (
+            "Изменение цены более чем на 30%, требуется ручная проверка"
+            if decision == "REVIEW"
+            else "Найдена минимальная цена"
+        ),
     }
 
 
