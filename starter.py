@@ -83,6 +83,13 @@ async def recommend_price(
         and offer["seller"].casefold() != "myshop"
     ]
 
+    if not prices:
+        return {
+            "price": current_price,
+            "decision": "HOLD",
+            "reason": "Нет подходящих предложений конкурентов",
+        }
+
     price = round(min(prices) * 0.985, 2)
 
     return {
