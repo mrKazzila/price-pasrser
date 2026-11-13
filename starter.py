@@ -41,7 +41,8 @@ reason (короткая понятная причина). Сохраните и
 """
 
 import asyncio
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
+
 
 
 async def recommend_price(
@@ -76,7 +77,7 @@ async def recommend_price(
         }
 
     prices = [
-        float(offer["price"])
+        offer["price"]
         for offer in result["offers"]
         if offer["delivery_days"] is not None
         and offer["delivery_days"] <= 6
@@ -90,13 +91,18 @@ async def recommend_price(
             "reason": "Нет подходящих предложений конкурентов",
         }
 
-    price = round(min(prices) * 0.985, 2)
+    competitor_price = (
+        min(prices) * Decimal("0.985")
+    ).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+
+    price = max(competitor_price, min_price)
 
     return {
         "price": price,
         "decision": "APPLY",
         "reason": "Найдена минимальная цена",
     }
+
 
 async def sample_fetch_offers():
     return {
