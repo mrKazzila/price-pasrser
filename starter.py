@@ -78,7 +78,9 @@ async def recommend_price(
     prices = [
         float(offer["price"])
         for offer in result["offers"]
-        if offer["delivery_days"] <= 6
+        if offer["delivery_days"] is not None
+        and offer["delivery_days"] <= 6
+        and offer["seller"].casefold() != "myshop"
     ]
 
     price = round(min(prices) * 0.985, 2)
@@ -88,7 +90,6 @@ async def recommend_price(
         "decision": "APPLY",
         "reason": "Найдена минимальная цена",
     }
-
 
 async def sample_fetch_offers():
     return {
