@@ -1,4 +1,5 @@
-"""Учебный фрагмент для тестового задания ТОЛЬКООПТ.
+"""
+Учебный фрагмент для тестового задания ТОЛЬКООПТ.
 
 Python 3.10+, только стандартная библиотека. Запуск примера: python starter.py
 В функции recommend_price намеренно есть ошибки. Исправьте её по правилам ниже.
@@ -43,15 +44,50 @@ import asyncio
 from decimal import Decimal
 
 
-async def recommend_price(fetch_offers, current_price, min_price, timeout_s=2.0):
-    result = await fetch_offers()
+async def recommend_price(
+    fetch_offers,
+    current_price,
+    min_price,
+    timeout_s=2.0,
+):
+    try:
+        result = await asyncio.wait_for(
+            fetch_offers(),
+            timeout=timeout_s,
+        )
+    except asyncio.TimeoutError:
+        return {
+            "price": current_price,
+            "decision": "HOLD",
+            "reason": "Превышено время ожидания источника",
+        }
+    except Exception:
+        return {
+            "price": current_price,
+            "decision": "HOLD",
+            "reason": "Ошибка источника",
+        }
+
+    if result["status"] != "success":
+        return {
+            "price": current_price,
+            "decision": "HOLD",
+            "reason": "Источник вернул неуспешный статус",
+        }
+
     prices = [
         float(offer["price"])
         for offer in result["offers"]
         if offer["delivery_days"] <= 6
     ]
+
     price = round(min(prices) * 0.985, 2)
-    return {"price": price, "decision": "APPLY", "reason": "Найдена минимальная цена"}
+
+    return {
+        "price": price,
+        "decision": "APPLY",
+        "reason": "Найдена минимальная цена",
+    }
 
 
 async def sample_fetch_offers():
